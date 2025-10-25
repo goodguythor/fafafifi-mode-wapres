@@ -17,7 +17,7 @@ WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 def weather_tool(mcp):     
     @mcp.tool()
-    def get_current_weather(location: str = "Yogyakarta") -> dict:
+    def get_current_weather(location: str) -> dict:
         """Get current weather information for a city"""
         if not location:
             return "Error: Missing 'location' parameter."
@@ -44,7 +44,7 @@ def weather_tool(mcp):
         return data
 
     @mcp.tool()
-    def get_forecast_weather(location: str = "Yogyakarta", days: int = 1) -> dict:
+    def get_forecast_weather(location: str, days: int) -> dict:
         """Get forecast weather information for a city in whole day."""
         if not location:
             return {"error": "Missing 'location' parameter."}
