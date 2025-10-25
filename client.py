@@ -67,10 +67,12 @@ class MCPClient:
             context = self.genai_client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=(
-                    f"Summarize relevant things in '{memories}' based on current query '{query}' to be used as a context"
+                    f"Summarize relevant things in '{memories}' based on current query '{query}' to be used as a short context with max 10 words like 'Running in Yogyakarta at hour x' or 'Workout recomendation for beginner'"
                 ),
+                config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=2)),
             )
             context = context.text.strip()
+            print(f"Context: {context}")
             query = f"User query: {query}\nRelevant context: {context}"
 
         # Step 1. Ask Gemini for a response
