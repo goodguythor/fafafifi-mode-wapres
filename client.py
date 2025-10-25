@@ -26,6 +26,8 @@ class MCPClient:
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
         self.genai_client = genai.Client()
+        self.tools = []
+        self.memory = []
 
     async def connect_to_server(self, server_script_path: str):
         """Connect to an MCP server)."""
@@ -36,8 +38,7 @@ class MCPClient:
         command = "python"
         server_params = StdioServerParameters(
             command=command,
-            args=[server_script_path],
-            env=None
+            args=[server_script_path]
         )
 
         stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
@@ -47,14 +48,7 @@ class MCPClient:
         await self.session.initialize()
 
         response = await self.session.list_tools()
-        tools = response.tools
-        print("\n✅ Connected to MCP server with tools:", [t.name for t in tools])
-
-    async def process_query(self, query: str) -> str:
-        """Send query to Gemini, detect tool use, execute it, and return final output."""
-
-        # Step 1. Get available MCP tools
-        response = await self.session.list_tools()
+        
         function_declarations = []
         for tool in response.tools:
             func = {
@@ -63,10 +57,23 @@ class MCPClient:
                 "parameters": tool.inputSchema,
             }
             function_declarations.append(func)
+        print("\n✅ Connected to MCP server with tools:", [t["name"] for t in function_declarations])
+        self.tools = [types.Tool(function_declarations=function_declarations)]
 
-        tools = [types.Tool(function_declarations=function_declarations)]
+    async def process_query(self, query: str) -> str:
+        """Send query to Gemini, detect tool use, execute it, and return final output."""
+        if self.memory:
+            memories = "\n".join(self.memory)
+            context = self.genai_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=(
+                    f"Summarize relevant things in '{memories}' based on current query '{query}' to be used as a context"
+                ),
+            )
+            context = context.text.strip()
+            query = f"User query: {query}\nRelevant context: {context}"
 
-        # Step 2. Ask Gemini for a response
+        # Step 1. Ask Gemini for a response
         llm_response = self.genai_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=query,
@@ -86,7 +93,7 @@ class MCPClient:
                         types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT
                     ]
                 ],
-                tools = tools
+                tools = self.tools
             ),
         )
 
@@ -126,12 +133,18 @@ class MCPClient:
             )
             final_text = follow_up.text.strip()
             print(f"\n🤖 fAfAfIfI: {final_text}")
+            self.memory.append(final_text)
+            if len(self.memory) > 5:
+                self.memory.pop(0)
             return final_text
 
         # ✅ Fallback: normal text response
         if llm_response.text:
             text = llm_response.text.strip()
             print(f"\n🧠 Gemini: {text}")
+            self.memory.append(text)
+            if len(self.memory) > 5:
+                self.memory.pop(0)
             return text
 
         print("⚠️ No text or function call found in Gemini response.")
