@@ -134,7 +134,10 @@ class MCPClient:
                 ),
             )
             final_text = follow_up.text.strip()
-            print(f"\n🤖 fAfAfIfI: {final_text}")
+            output = f"\nfAfAfIfI: {final_text}"
+            print(output)
+            with open("logs/logs.txt", "a") as file:
+                file.write(output)
             self.memory.append(final_text)
             if len(self.memory) > 5:
                 self.memory.pop(0)
@@ -143,7 +146,10 @@ class MCPClient:
         # ✅ Fallback: normal text response
         if llm_response.text:
             text = llm_response.text.strip()
-            print(f"\n🧠 Gemini: {text}")
+            output = f"\nfAfAfIfI: {text}"
+            print(output)
+            with open("logs/logs.txt", "a") as file:
+                file.write(output)
             self.memory.append(text)
             if len(self.memory) > 5:
                 self.memory.pop(0)
@@ -160,6 +166,8 @@ class MCPClient:
             query = input("\nYou: ").strip()
             if query.lower() == "quit":
                 break
+            with open("logs/logs.txt", "a") as file:
+                file.write("\nYou: " + query)
             try:
                 await self.process_query(query)
             except Exception as e:
