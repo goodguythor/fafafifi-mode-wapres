@@ -67,9 +67,9 @@ class MCPClient:
             context = self.genai_client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=(
-                    f"Summarize relevant things in '{memories}' based on current query '{query}' to be used as a short context with max 10 words like 'Running in Yogyakarta at hour x' or 'Workout recomendation for beginner'"
+                    f"Summarize '{memories}' to be used as a short context with max 5 words like 'Running in Yogyakarta' or 'Workout recomendation for beginner'"
                 ),
-                config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=2)),
+                config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=10)),
             )
             context = context.text.strip()
             print(f"Context: {context}")
@@ -134,25 +134,11 @@ class MCPClient:
                 ),
             )
             final_text = follow_up.text.strip()
-            output = f"\nfAfAfIfI: {final_text}"
-            print(output)
-            with open("logs/logs.txt", "a") as file:
-                file.write(output)
-            self.memory.append(final_text)
-            if len(self.memory) > 5:
-                self.memory.pop(0)
             return final_text
 
         # ✅ Fallback: normal text response
         if llm_response.text:
             text = llm_response.text.strip()
-            output = f"\nfAfAfIfI: {text}"
-            print(output)
-            with open("logs/logs.txt", "a") as file:
-                file.write(output)
-            self.memory.append(text)
-            if len(self.memory) > 5:
-                self.memory.pop(0)
             return text
 
         print("⚠️ No text or function call found in Gemini response.")
@@ -169,7 +155,14 @@ class MCPClient:
             with open("logs/logs.txt", "a") as file:
                 file.write("\nYou: " + query)
             try:
-                await self.process_query(query)
+                final_text = await self.process_query(query) 
+                output = f"\nfAfAfIfI: {final_text}"
+                print(output)
+                with open("logs/logs.txt", "a") as file:
+                    file.write(output)
+                self.memory.append(final_text)
+                if len(self.memory) > 5:
+                    self.memory.pop(0)
             except Exception as e:
                 print(f"❌ Error: {e}")
 
