@@ -135,19 +135,24 @@ class MCPClient:
             ltm = []
         relevant_memories = "\n".join(ltm)
 
-        # === Process STM + Save new LTM summary ===
         if self.memory:
             memories = "\n".join(self.memory)
             context = self.genai_client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=f"Summarize '{memories}' in max 5 words (like 'Running in Yogyakarta' or 'Workout for beginner')",
+                contents=f"Summarize '{memories}' into something like 'Running in Yogyakarta' or 'Workout for beginner' that is relevant to query {query}, always add city, name, place, time, situation, or activity name if it's included in memories, only include the summary and don't add anything else",
                 config=types.GenerateContentConfig(
                     thinking_config=types.ThinkingConfig(thinking_budget=10)
                 ),
-            )
-            context = context.text.strip()
-            print(f"Context summary: {context}")
+            ).text.strip()
             query = f"User query: {query}\nContext: {context}\nRelevant memories: {relevant_memories}"
+            query = self.genai_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=f"Combine {query} into one complete query",
+                config=types.GenerateContentConfig(
+                    thinking_config=types.ThinkingConfig(thinking_budget=10)
+                ),
+            ).text.strip()
+            print(f"Refined Query: {query}")
 
         # === Call Gemini ===
         llm_response = self.genai_client.models.generate_content(
@@ -229,7 +234,18 @@ class MCPClient:
                 summary = self.genai_client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=(
-                        f"Summarize '{final_text}' into something like this 'User ask is it okay to run at rain' or 'Agent recommend user gym place around Yogyakarta'."
+                        f"""
+                        Summarize '{final_text}' into one concise sentence describing what happened in the conversation.  
+                        Examples:  
+                        - "User asked if it’s okay to run in the rain."  
+                        - "Agent recommended a gym around Yogyakarta."  
+                        Always include these details if present:
+                        - City (e.g., "Yogyakarta", "Jakarta")  
+                        - Weather (e.g., "rain", "sunny")  
+                        - Time (e.g., "5 PM")  
+                        - Day (e.g., "Monday")  
+                        Only return the summary sentence — no explanations, quotes, or extra words.
+                        """
                     ),
                 ).text.strip()
                 embedding = self.embed_result(summary)
