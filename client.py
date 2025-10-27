@@ -147,7 +147,7 @@ class MCPClient:
             query = f"User query: {query}\nContext: {context}\nRelevant memories: {relevant_memories}"
             query = self.genai_client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=f"Combine {query} into one complete query",
+                contents=f"Combine {query} into one complete query, only include the query and don't add anything",
                 config=types.GenerateContentConfig(
                     thinking_config=types.ThinkingConfig(thinking_budget=10)
                 ),
