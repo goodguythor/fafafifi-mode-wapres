@@ -1,8 +1,10 @@
+import numpy as np
 import asyncio
 import json
 import sys
 import psycopg
 import os
+import re
 from contextlib import AsyncExitStack
 from typing import Optional
 from dotenv import load_dotenv
@@ -30,6 +32,20 @@ def extract_text(content_list):
     return str(content_list)
 
 
+def parse_vector_string(vector_str):
+    vector_str = vector_str.strip()
+    vector_str = vector_str.strip("[]")  # remove brackets if any
+
+    # Replace any whitespace or semicolon with commas
+    vector_str = re.sub(r"[\s;]+", ",", vector_str)
+
+    # Split and convert to float
+    try:
+        floats = np.array([float(x) for x in vector_str.split(",") if x.strip() != ""], dtype=float)
+        return floats
+    except ValueError as e:
+        raise ValueError(f"Failed to parse vector: {vector_str[:100]}...") from e
+
 class MCPClient:
     def __init__(self, dbname, user, password, host, port):
         self.conn = psycopg.connect(
@@ -45,7 +61,19 @@ class MCPClient:
         self.tools = []
         self.memory = []
 
-    # ✅ Fix SQL syntax
+    def cosine_similarity(self, a, b):
+        a = np.array(a)
+        b = np.array(b)
+        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+    def compare_embedding(self, query_embedding, memories):
+        result = []
+        for embedding, summary in memories:
+            similarity = self.cosine_similarity(embedding, query_embedding)
+            if similarity > 0.5:
+                result.append(summary)
+        return result
+
     def create_table(self):
         with self.conn.cursor() as cur:
             cur.execute("""
@@ -73,21 +101,25 @@ class MCPClient:
     def fetch_ltm(self, server_id, channel_id, thread_id, embedding):
         with self.conn.cursor() as cur:
             cur.execute("""
-                SELECT summary
+                SELECT embedding, summary
                 FROM memory_vectors
                 WHERE server_id = %s AND channel_id = %s AND thread_id = %s
                 ORDER BY embedding <=> %s::vector
                 LIMIT 3;
             """, (server_id, channel_id, thread_id, embedding))
             rows = cur.fetchall()
-        return [r[0] for r in rows]
+        
+        if not rows:
+            return []
 
-    def insert_stm(self, text: str):
-        self.memory.append(text)
+        ltm = [(parse_vector_string(r[0]), r[1]) for r in rows]
+        return self.compare_embedding(embedding, ltm)
+
+    def insert_stm(self, embedding, text):
+        self.memory.append((embedding, text))
         if len(self.memory) > 5:
             self.memory.pop(0)
 
-    # ✅ Typo: std → str
     def embed_result(self, text: str):
         result = self.genai_client.models.embed_content(
             model="models/text-embedding-004",
@@ -133,26 +165,32 @@ class MCPClient:
         except Exception as e:
             print(f"⚠️ Fetch Long Term Memory failed: {e}")
             ltm = []
-        relevant_memories = "\n".join(ltm)
+        relevant_ltm = "\n".join(ltm)
 
         if self.memory:
-            memories = "\n".join(self.memory)
+            stm = self.compare_embedding(query_embedding, self.memory)
+            relevant_stm = "\n".join(stm)
             context = self.genai_client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=f"Summarize '{memories}' into something like 'Running in Yogyakarta' or 'Workout for beginner' that is relevant to query {query}, always add city, name, place, time, situation, or activity name if it's included in memories, only include the summary and don't add anything else",
+                contents=f"Summarize '{relevant_stm}' into something like 'Running in Yogyakarta' or 'Workout for beginner' that is relevant to query {query}, always add city, name, place, time, situation, or activity name if it's included in memories, only include the summary and don't add anything else",
                 config=types.GenerateContentConfig(
                     thinking_config=types.ThinkingConfig(thinking_budget=10)
                 ),
             ).text.strip()
-            query = f"User query: {query}\nContext: {context}\nRelevant memories: {relevant_memories}"
-            query = self.genai_client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=f"Combine {query} into one complete query, only include the query and don't add anything",
-                config=types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(thinking_budget=10)
-                ),
-            ).text.strip()
-            print(f"Refined Query: {query}")
+        else:
+            context = "There are no relevant context"
+            
+        query = f"User query: {query}\nContext: {context}\nRelevant memories: {relevant_ltm}"
+        print(query)
+        
+        query = self.genai_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"Combine {query} into one complete query, only include the query and don't add anything",
+            config=types.GenerateContentConfig(
+                thinking_config=types.ThinkingConfig(thinking_budget=10)
+            ),
+        ).text.strip()
+        print(f"Refined Query: {query}")
 
         # === Call Gemini ===
         llm_response = self.genai_client.models.generate_content(
@@ -160,9 +198,9 @@ class MCPClient:
             contents=query,
             config=types.GenerateContentConfig(
                 system_instruction=(
-                    "You are fAfAfIfI, a workout assistant bot, only answer workout related question and combine your answer with available tools, You can use external tools from the MCP server to improve your answers, You can use multiple external tools from the MCP server in one answer. Write each tool call on a new line, exactly in this format: @tool:tool_name(arg1=value1,arg2=value2). You may call multiple tools if the query needs multiple data sources.",
+                    "You are fAfAfIfI, a workout assistant bot, only answer workout related question and combine your answer with available tools, You can use external tools from the MCP server to improve your answers, You can use multiple external tools from the MCP server in one answer. Write each tool call on a new line, exactly in this format: @tool:tool_name(arg1=value1,arg2=value2). You may call multiple tools if the query needs multiple data sources. Always answer in plain text and don't use markdown format",
                 ),
-                thinking_config=types.ThinkingConfig(thinking_budget=10),
+                thinking_config=types.ThinkingConfig(thinking_budget=20),
                 safety_settings=[
                     types.SafetySetting(
                         category=category,
@@ -208,7 +246,7 @@ class MCPClient:
                 contents=(
                     f"User query: {query}\n\n"
                     f"Tool results: {combined_summary}\n\n"
-                    "Summarize the combined results into a coherent workout-related answer."
+                    "Summarize the combined results into a coherent workout-related answer with plain text answer and don't use markdown format."
                 ),
             )
             return follow_up.text.strip()
@@ -241,15 +279,13 @@ class MCPClient:
                         - "Agent recommended a gym around Yogyakarta."  
                         Always include these details if present:
                         - City (e.g., "Yogyakarta", "Jakarta")  
-                        - Weather (e.g., "rain", "sunny")  
-                        - Time (e.g., "5 PM")  
                         - Day (e.g., "Monday")  
                         Only return the summary sentence — no explanations, quotes, or extra words.
                         """
                     ),
                 ).text.strip()
                 embedding = self.embed_result(summary)
-                self.insert_stm(summary)
+                self.insert_stm(embedding, summary)
                 self.insert_ltm("cli", "cli", "cli", embedding, summary)
                 output = f"\nfAfAfIfI: {final_text}"
                 print(output)
