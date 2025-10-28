@@ -65,27 +65,7 @@ async def on_message(message):
         # === Ask MCPClient to process the query ===
         final_text = await mcp_client.process_query(user_input)
 
-        # === Generate summary for memory ===
-        summary = mcp_client.genai_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=(
-                f"""
-                Summarize '{final_text}' into one concise sentence describing what happened in the conversation.  
-                Examples:  
-                - "User asked if it’s okay to run in the rain."  
-                - "Agent recommended a gym around Yogyakarta."  
-                Always include these details if present:
-                - City (e.g., "Yogyakarta", "Jakarta")  
-                - Day (e.g., "Monday")  
-                Only return the summary sentence — no explanations, quotes, or extra words.
-                """
-            ),
-        ).text.strip()
-
-        # === Create embedding & store memory ===
-        embedding = mcp_client.embed_result(summary)
-        mcp_client.insert_stm(embedding, summary)
-        mcp_client.insert_ltm(server_id, channel_id, thread_id, embedding, summary)
+        mcp_client.process_output(final_text)
 
         # === Send reply back to Discord ===
         await message.reply(f"🧠 {final_text[:1900]}")  # 2000 char Discord limit
