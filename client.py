@@ -61,6 +61,26 @@ class MCPClient:
         self.tools = []
         self.memory = []
 
+    def process_output(self, output):
+        summary = self.genai_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=(
+                f"""
+                Summarize '{output}' into one concise sentence describing what happened in the conversation.  
+                Examples:  
+                - "User asked if it’s okay to run in the rain."  
+                - "Agent recommended a gym around Yogyakarta."  
+                Always include these details if present:
+                - City (e.g., "Yogyakarta", "Jakarta")  
+                - Day (e.g., "Monday")  
+                Only return the summary sentence — no explanations, quotes, or extra words.
+                """
+            ),
+        ).text.strip()
+        embedding = self.embed_result(summary)
+        self.insert_stm(embedding, summary)
+        self.insert_ltm("cli", embedding, summary)
+
     def cosine_similarity(self, a, b):
         a = np.array(a)
         b = np.array(b)
@@ -267,24 +287,7 @@ class MCPClient:
                 file.write("\nYou: " + query)
             try:
                 final_text = await self.process_query(query)
-                summary = self.genai_client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=(
-                        f"""
-                        Summarize '{final_text}' into one concise sentence describing what happened in the conversation.  
-                        Examples:  
-                        - "User asked if it’s okay to run in the rain."  
-                        - "Agent recommended a gym around Yogyakarta."  
-                        Always include these details if present:
-                        - City (e.g., "Yogyakarta", "Jakarta")  
-                        - Day (e.g., "Monday")  
-                        Only return the summary sentence — no explanations, quotes, or extra words.
-                        """
-                    ),
-                ).text.strip()
-                embedding = self.embed_result(summary)
-                self.insert_stm(embedding, summary)
-                self.insert_ltm("cli", embedding, summary)
+                self.process_output(final_text)
                 output = f"\nfAfAfIfI: {final_text}"
                 print(output)
                 with open("logs/logs.txt", "a") as file:
