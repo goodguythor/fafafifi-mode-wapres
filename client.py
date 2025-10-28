@@ -80,9 +80,7 @@ class MCPClient:
                 CREATE EXTENSION IF NOT EXISTS vector;
                 CREATE TABLE IF NOT EXISTS memory_vectors (
                     id SERIAL PRIMARY KEY,
-                    server_id TEXT NOT NULL,
                     channel_id TEXT NOT NULL,
-                    thread_id TEXT NOT NULL,
                     embedding VECTOR(768) NOT NULL,
                     summary TEXT NOT NULL,
                     timestamp TIMESTAMP DEFAULT NOW()
@@ -90,23 +88,23 @@ class MCPClient:
             """)
             self.conn.commit()
 
-    def insert_ltm(self, server_id, channel_id, thread_id, embedding, summary):
+    def insert_ltm(self, channel_id, embedding, summary):
         with self.conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO memory_vectors (server_id, channel_id, thread_id, embedding, summary)
-                VALUES (%s, %s, %s, %s::vector, %s);
-            """, (server_id, channel_id, thread_id, embedding, summary))
+                INSERT INTO memory_vectors (channel_id, embedding, summary)
+                VALUES (%s, %s::vector, %s);
+            """, (channel_id, embedding, summary))
             self.conn.commit()
 
-    def fetch_ltm(self, server_id, channel_id, thread_id, embedding):
+    def fetch_ltm(self, channel_id, embedding):
         with self.conn.cursor() as cur:
             cur.execute("""
                 SELECT embedding, summary
                 FROM memory_vectors
-                WHERE server_id = %s AND channel_id = %s AND thread_id = %s
+                WHERE channel_id = %s
                 ORDER BY embedding <=> %s::vector
                 LIMIT 3;
-            """, (server_id, channel_id, thread_id, embedding))
+            """, (channel_id, embedding))
             rows = cur.fetchall()
         
         if not rows:
@@ -156,12 +154,12 @@ class MCPClient:
         print("\n✅ Connected to MCP server with tools:", [t["name"] for t in function_declarations])
         self.tools = [types.Tool(function_declarations=function_declarations)]
 
-    async def process_query(self, query: str, server_id: str = "cli", channel_id: str = "cli", thread_id: str = "cli") -> str:
+    async def process_query(self, query: str, channel_id: str = "cli") -> str:
         """Send query to Gemini, detect tool use, and store relevant memories."""
         # === Retrieve similar LTM ===
         try:
             query_embedding = self.embed_result(query)
-            ltm = self.fetch_ltm(server_id, channel_id, thread_id, query_embedding)
+            ltm = self.fetch_ltm(channel_id, query_embedding)
         except Exception as e:
             print(f"⚠️ Fetch Long Term Memory failed: {e}")
             ltm = []
@@ -286,7 +284,7 @@ class MCPClient:
                 ).text.strip()
                 embedding = self.embed_result(summary)
                 self.insert_stm(embedding, summary)
-                self.insert_ltm("cli", "cli", "cli", embedding, summary)
+                self.insert_ltm("cli", embedding, summary)
                 output = f"\nfAfAfIfI: {final_text}"
                 print(output)
                 with open("logs/logs.txt", "a") as file:
