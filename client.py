@@ -156,12 +156,12 @@ class MCPClient:
         print("\n✅ Connected to MCP server with tools:", [t["name"] for t in function_declarations])
         self.tools = [types.Tool(function_declarations=function_declarations)]
 
-    async def process_query(self, query: str) -> str:
+    async def process_query(self, query: str, server_id: str = "cli", channel_id: str = "cli", thread_id: str = "cli") -> str:
         """Send query to Gemini, detect tool use, and store relevant memories."""
         # === Retrieve similar LTM ===
         try:
             query_embedding = self.embed_result(query)
-            ltm = self.fetch_ltm("cli", "cli", "cli", query_embedding)
+            ltm = self.fetch_ltm(server_id, channel_id, thread_id, query_embedding)
         except Exception as e:
             print(f"⚠️ Fetch Long Term Memory failed: {e}")
             ltm = []
@@ -187,7 +187,7 @@ class MCPClient:
             model="gemini-2.5-flash",
             contents=f"Combine {query} into one complete query, only include the query and don't add anything",
             config=types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_budget=10)
+                thinking_config=types.ThinkingConfig(thinking_budget=2)
             ),
         ).text.strip()
         print(f"Refined Query: {query}")
@@ -200,7 +200,7 @@ class MCPClient:
                 system_instruction=(
                     "You are fAfAfIfI, a workout assistant bot, only answer workout related question and combine your answer with available tools, You can use external tools from the MCP server to improve your answers, You can use multiple external tools from the MCP server in one answer. Write each tool call on a new line, exactly in this format: @tool:tool_name(arg1=value1,arg2=value2). You may call multiple tools if the query needs multiple data sources. Always answer in plain text and don't use markdown format",
                 ),
-                thinking_config=types.ThinkingConfig(thinking_budget=20),
+                thinking_config=types.ThinkingConfig(thinking_budget=10),
                 safety_settings=[
                     types.SafetySetting(
                         category=category,
