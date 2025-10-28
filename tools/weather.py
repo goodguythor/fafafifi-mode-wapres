@@ -45,7 +45,7 @@ def weather_tool(mcp):
 
     @mcp.tool()
     def get_forecast_weather(location: str, days: int) -> dict:
-        """Get forecast weather information for a city in whole day."""
+        """Get forecast weather information for a city in whole day. days -> (0 = today, 1 = tomorrow, 2 = 2 days later, so on)"""
         if not location:
             return {"error": "Missing 'location' parameter."}
 
@@ -78,7 +78,7 @@ def weather_tool(mcp):
 
     @mcp.tool()
     def get_hour_forecast_weather(location: str, days: int, hour: int) -> dict:
-        """Get forecast weather information for a city in a specific hour (24 hour format)."""
+        """Get forecast weather information for a city in a specific hour -> (24 hour format), days -> (0 = today, 1 = tomorrow, 2 = 2 days later, so on)."""
         if not location:
             return {"error": "Missing 'location' parameter."}
 
