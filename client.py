@@ -69,7 +69,7 @@ class MCPClient:
 
     async def process_output(self, output, channel_id = "cli"):
         summary = self.genai_client.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash",
             contents=(
                 f"""
                 Summarize '{output}' into one concise sentence describing what happened in the conversation.  
