@@ -68,11 +68,11 @@ class MCPClient:
                 f"""
                 Summarize '{output}' into one concise sentence describing what happened in the conversation.  
                 Examples:  
-                - "User asked if it’s okay to run in the rain."  
-                - "Agent recommended a gym around Yogyakarta."  
+                - "Wants to know whether it is advisable to run in this condition"
+                - "Is asking about gym recommendation around Yogyakarta"  
                 Always include these details if present:
                 - City (e.g., "Yogyakarta", "Jakarta")  
-                - Day (e.g., "Monday")  
+                - Day (e.g., "Monday", "Today", "Tomorrow")  
                 Only return the summary sentence — no explanations, quotes, or extra words.
                 """
             ),
@@ -90,7 +90,7 @@ class MCPClient:
         result = []
         for embedding, summary in memories:
             similarity = self.cosine_similarity(embedding, query_embedding)
-            if similarity > 0.5:
+            if similarity > 0.4:
                 result.append(summary)
         return result
 
@@ -186,11 +186,11 @@ class MCPClient:
         relevant_ltm = "\n".join(ltm)
 
         if self.memory:
-            stm = self.compare_embedding(query_embedding, self.memory)
+            stm = [m[1] for m in self.memory]
             relevant_stm = "\n".join(stm)
             context = self.genai_client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=f"Summarize '{relevant_stm}' into something like 'Running in Yogyakarta' or 'Workout for beginner' that is relevant to query {query}, always add city, name, place, time, situation, or activity name if it's included in memories, only include the summary and don't add anything else",
+                contents=f"Summarize '{relevant_stm}' into something like 'Running in Yogyakarta now' or 'Workout for beginner' or 'Outdoor workout for tomorrow' that is relevant to query {query}, always add city, name, place, time, situation, or activity name if it's included in memories, only include the summary and don't add anything else",
                 config=types.GenerateContentConfig(
                     thinking_config=types.ThinkingConfig(thinking_budget=10)
                 ),
@@ -218,7 +218,7 @@ class MCPClient:
                 system_instruction=(
                     "You are fAfAfIfI, a workout assistant bot, only answer workout related question and combine your answer with available tools, You can use external tools from the MCP server to improve your answers, You can use multiple external tools from the MCP server in one answer. Write each tool call on a new line, exactly in this format: @tool:tool_name(arg1=value1,arg2=value2). You may call multiple tools if the query needs multiple data sources. Always answer in plain text and don't use markdown format",
                 ),
-                thinking_config=types.ThinkingConfig(thinking_budget=10),
+                thinking_config=types.ThinkingConfig(thinking_budget=20),
                 safety_settings=[
                     types.SafetySetting(
                         category=category,
