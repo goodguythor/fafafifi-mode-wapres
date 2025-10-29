@@ -63,7 +63,7 @@ async def on_message(message):
         # === Ask MCPClient to process the query ===
         final_text = await mcp_client.process_query(user_input, channel_id)
 
-        mcp_client.process_output(final_text, channel_id)
+        await mcp_client.process_output(final_text, channel_id)
 
         # === Send reply back to Discord ===
         await message.reply(f"🧠 {final_text[:1900]}")  # 2000 char Discord limit

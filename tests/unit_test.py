@@ -15,7 +15,7 @@ parent_dir = os.path.abspath(os.path.join(current_dir, '..'))
 # Add the parent directory to sys.path
 sys.path.append(parent_dir)
 
-from client import MCPClient, parse_vector_string
+from client import MCPClient, parse_vector_string, cosine_similarity
 
 load_dotenv()
 
@@ -46,8 +46,8 @@ class TestSimilarity(unittest.TestCase):
         b = np.array([1, 0, 0])
         c = np.array([0, 1, 0])
 
-        self.assertAlmostEqual(client.cosine_similarity(a, b), 1.0)
-        self.assertAlmostEqual(client.cosine_similarity(a, c), 0.0)
+        self.assertAlmostEqual(cosine_similarity(a, b), 1.0)
+        self.assertAlmostEqual(cosine_similarity(a, c), 0.0)
 
     def test_compare_embedding_threshold(self):
         query_emb = np.array([1.0, 0.0])
@@ -67,8 +67,8 @@ class TestSimilarity(unittest.TestCase):
 
 
 class TestAsyncProcessQuery(unittest.IsolatedAsyncioTestCase):
-    @patch("client.MCPClient.embed_result", return_value=np.zeros(768))
-    @patch("client.MCPClient.fetch_ltm", return_value=["past workout summary"])
+    @patch("client.MCPClient.embed_result", new_callable=AsyncMock, return_value=np.zeros(768))
+    @patch("client.MCPClient.fetch_ltm", new_callable=AsyncMock, return_value=["past workout summary"])
     @patch("client.genai.Client")
     async def test_process_query_basic(self, mock_genai_client, mock_embed, mock_fetch):
         # Mock Gemini’s response

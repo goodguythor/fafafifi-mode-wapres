@@ -46,6 +46,12 @@ def parse_vector_string(vector_str):
     except ValueError as e:
         raise ValueError(f"Failed to parse vector: {vector_str[:100]}...") from e
 
+def cosine_similarity(a, b):
+    a = np.array(a)
+    b = np.array(b)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
 class MCPClient:
     def __init__(self, dbname, user, password, host, port):
         self.conn = psycopg.connect(
@@ -61,9 +67,9 @@ class MCPClient:
         self.tools = []
         self.memory = []
 
-    def process_output(self, output, channel_id = "cli"):
+    async def process_output(self, output, channel_id = "cli"):
         summary = self.genai_client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash-exp",
             contents=(
                 f"""
                 Summarize '{output}' into one concise sentence describing what happened in the conversation.  
@@ -77,24 +83,19 @@ class MCPClient:
                 """
             ),
         ).text.strip()
-        embedding = self.embed_result(summary)
+        embedding = await self.embed_result(summary)
         self.insert_stm(embedding, summary)
-        self.insert_ltm(channel_id, embedding, summary)
-
-    def cosine_similarity(self, a, b):
-        a = np.array(a)
-        b = np.array(b)
-        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
+        await self.insert_ltm(channel_id, embedding, summary)
+    
     def compare_embedding(self, query_embedding, memories):
         result = []
         for embedding, summary in memories:
-            similarity = self.cosine_similarity(embedding, query_embedding)
+            similarity = cosine_similarity(embedding, query_embedding)
             if similarity > 0.4:
                 result.append(summary)
         return result
 
-    def create_table(self):
+    async def create_table(self):
         with self.conn.cursor() as cur:
             cur.execute("""
                 CREATE EXTENSION IF NOT EXISTS vector;
@@ -108,7 +109,7 @@ class MCPClient:
             """)
             self.conn.commit()
 
-    def insert_ltm(self, channel_id, embedding, summary):
+    async def insert_ltm(self, channel_id, embedding, summary):
         with self.conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO memory_vectors (channel_id, embedding, summary)
@@ -116,7 +117,7 @@ class MCPClient:
             """, (channel_id, embedding, summary))
             self.conn.commit()
 
-    def fetch_ltm(self, channel_id, embedding):
+    async def fetch_ltm(self, channel_id, embedding):
         with self.conn.cursor() as cur:
             cur.execute("""
                 SELECT embedding, summary
@@ -138,7 +139,7 @@ class MCPClient:
         if len(self.memory) > 5:
             self.memory.pop(0)
 
-    def embed_result(self, text: str):
+    async def embed_result(self, text: str):
         result = self.genai_client.models.embed_content(
             model="models/text-embedding-004",
             contents=text
@@ -178,8 +179,8 @@ class MCPClient:
         """Send query to Gemini, detect tool use, and store relevant memories."""
         # === Retrieve similar LTM ===
         try:
-            query_embedding = self.embed_result(query)
-            ltm = self.fetch_ltm(channel_id, query_embedding)
+            query_embedding = await self.embed_result(query)
+            ltm = await self.fetch_ltm(channel_id, query_embedding)
         except Exception as e:
             print(f"⚠️ Fetch Long Term Memory failed: {e}")
             ltm = []
@@ -305,7 +306,7 @@ async def main():
         sys.exit(1)
 
     client = MCPClient(DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
-    client.create_table()
+    await client.create_table()
     try:
         await client.connect_to_server(sys.argv[1])
         await client.chat_loop()
