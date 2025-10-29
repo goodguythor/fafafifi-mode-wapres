@@ -32,7 +32,7 @@ async def on_ready():
     global mcp_client
     # Initialize MCP client
     mcp_client = MCPClient(DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT)
-    mcp_client.create_table()
+    await mcp_client.create_table()
 
     # Connect to MCP server
     await mcp_client.connect_to_server(SERVER_PATH)
