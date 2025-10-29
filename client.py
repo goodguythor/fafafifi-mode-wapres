@@ -61,7 +61,7 @@ class MCPClient:
         self.tools = []
         self.memory = []
 
-    def process_output(self, output):
+    def process_output(self, output, channel_id = "cli"):
         summary = self.genai_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=(
@@ -79,7 +79,7 @@ class MCPClient:
         ).text.strip()
         embedding = self.embed_result(summary)
         self.insert_stm(embedding, summary)
-        self.insert_ltm("cli", embedding, summary)
+        self.insert_ltm(channel_id, embedding, summary)
 
     def cosine_similarity(self, a, b):
         a = np.array(a)
@@ -174,7 +174,7 @@ class MCPClient:
         print("\n✅ Connected to MCP server with tools:", [t["name"] for t in function_declarations])
         self.tools = [types.Tool(function_declarations=function_declarations)]
 
-    async def process_query(self, query: str, channel_id: str = "cli") -> str:
+    async def process_query(self, query: str, channel_id="cli") -> str:
         """Send query to Gemini, detect tool use, and store relevant memories."""
         # === Retrieve similar LTM ===
         try:

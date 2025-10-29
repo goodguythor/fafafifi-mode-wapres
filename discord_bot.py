@@ -55,17 +55,15 @@ async def on_message(message):
         return
 
     user_input = message.content[len("!fit "):].strip()
-    server_id = str(message.guild.id) if message.guild else "dm"
     channel_id = str(message.channel.id)
-    thread_id = str(message.id)
 
     await message.channel.typing()
 
     try:
         # === Ask MCPClient to process the query ===
-        final_text = await mcp_client.process_query(user_input)
+        final_text = await mcp_client.process_query(user_input, channel_id)
 
-        mcp_client.process_output(final_text)
+        mcp_client.process_output(final_text, channel_id)
 
         # === Send reply back to Discord ===
         await message.reply(f"🧠 {final_text[:1900]}")  # 2000 char Discord limit
