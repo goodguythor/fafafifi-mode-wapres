@@ -172,7 +172,6 @@ class MCPClient:
                 "parameters": tool.inputSchema,
             }
             function_declarations.append(func)
-        print("\n✅ Connected to MCP server with tools:", [t["name"] for t in function_declarations])
         self.tools = [types.Tool(function_declarations=function_declarations)]
 
     async def process_query(self, query: str, channel_id="cli") -> str:
@@ -200,7 +199,6 @@ class MCPClient:
             context = "There are no relevant context"
             
         query = f"User query: {query}\nContext: {context}\nRelevant memories: {relevant_ltm}"
-        print(query)
         
         query = self.genai_client.models.generate_content(
             model="gemini-2.5-flash",
@@ -209,7 +207,6 @@ class MCPClient:
                 thinking_config=types.ThinkingConfig(thinking_budget=2)
             ),
         ).text.strip()
-        print(f"Refined Query: {query}")
 
         # === Call Gemini ===
         llm_response = self.genai_client.models.generate_content(
@@ -246,7 +243,6 @@ class MCPClient:
                 fn = part.function_call
                 tool_name = fn.name
                 json_args = fn.args or {}
-                print(f"\n🧠 Gemini wants to call '{tool_name}' with args {json_args}")
                 try:
                     tool_result = await self.session.call_tool(tool_name, json_args)
                     tool_results.append({
@@ -288,7 +284,7 @@ class MCPClient:
                 file.write("\nYou: " + query)
             try:
                 final_text = await self.process_query(query)
-                self.process_output(final_text)
+                await self.process_output(final_text)
                 output = f"\nfAfAfIfI: {final_text}"
                 print(output)
                 with open("logs/logs.txt", "a") as file:
