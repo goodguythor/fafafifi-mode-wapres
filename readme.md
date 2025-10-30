@@ -47,7 +47,7 @@ python discord_bot.py
 ## Demo
 This bot could only catch first person pattern like `I just workout today` and not `He just workout today` 
 ### CLI Mode
-To test the bot, you just need to type anything in the terminal after you run the file. To exit, you just need to press `CTRL + C`. All the chat logs on CLI mode will be written in the file called `logs.txt` that is located on the `\logs` folder.
+To test the bot, you just need to type anything in the terminal after you run the file. To exit, you just need to press `CTRL + C` or type `quit`. All the chat logs on CLI mode will be written in the file called `logs.txt` that is located on the `\logs` folder.
 
 ![alt text](screenshots/cli.png)
 ### Discord Mode
