@@ -45,13 +45,12 @@ Once your bot arrived at the server, you just need to run the discord_bot.py wit
 python discord_bot.py
 ```
 ## Demo
-This bot could only catch first person pattern like `I just workout today` and not `He just workout today` 
 ### CLI Mode
 To test the bot, you just need to type anything in the terminal after you run the file. To exit, you just need to press `CTRL + C` or type `quit`. All the chat logs on CLI mode will be written in the file called `logs.txt` that is located on the `\logs` folder.
 
 ![alt text](screenshots/cli.png)
 ### Discord Mode
 
-To test the bot, you just need to send message in your server like this:
+To test the bot, you just need to send message in your server with !fit command like this:
 
 ![alt text](screenshots/discord.png)
